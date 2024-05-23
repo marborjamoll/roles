@@ -1,4 +1,4 @@
-# Roles and Privileges: The Library
+# Library Roles Activity
 ## 1. Create the database 
 ```sql
 CREATE DATABASE library;
@@ -152,19 +152,65 @@ SELECT userid FROM users;
 ```
 Everything goes OK but, if we execute this other query
 ```sql
-SELECT userid FROM users;
+SELECT * FROM users;
 ```
 We'll get the error *permission denied for table users*.
 
 ## 10. RLS (Row Level Security)
+The last step is adding some security policies. The objective is the users can't see data for security reasons.
 
+For example, a user can't see the usernames, emails and password of other users. Or, a user can't see the reservations of the other users, can see just their own reservations.
+
+So, let's start with this example. A user (reader) must see just their own reservations.
+
+The first step is enable the row level security in the table.
+```sql
+ALTER TABLE reservations
+ENABLE ROW LEVEL SECURITY;
+```
+Now we have a little problem, we just can know the current user name. We can see our actual username with:
+```sql
+SELECT current_user;
+```
+This returns the **username** but, in the table `reservations` we don't have the user name, we have the column `userid`. So, what we should do in order to get the `userid` if the just know the `name`? With a query:
+```sql
+SELECT userid FROM users WHERE name = current_user;
+```
+
+Let's apply the policy:
+```sql
+CREATE POLICY own_readers_reservations
+ON reservations 
+TO readers
+USING (userid = (SELECT userid FROM users WHERE name = current_user));
+```
+
+If we execute the query, using a **reader** user:
+```sql
+SELECT * FROM reservations;
+```
+This user should see their own reservations.
+
+If this doesen't work, make sure the role name is equal to the user name linked to this reservation. And make sure also this user has reservations.
+
+**What happens is this policy applies to all users?**
+In the superuser, we can enable an option that policies don't affect to the superuser.
+
+```sql
+ALTER ROLE library_admin
+BYPASSRLS;
+```
 
 
 ## Drop Roles
+This is an example of how can delete roles. If the role isn't owner of anything is easier but, if the role is owner of tables on databases:
 ```sql
+-- replace the owner
 REASSIGN OWNED BY library_admin TO postgres;
 
+-- drop the owner attribute
 DROP OWNED BY library_admin;
 
+-- drop the role
 DROP ROLE library_admin;
 ```
